@@ -1,0 +1,22 @@
+# Plaats als: .github/workflows/momentum.yml
+name: momentum-scanner
+
+on:
+  schedule:
+    # 20:30 UTC = 22:30 CEST / 21:30 CET -- na de US-close, zodat de dagbeweging meetelt.
+    - cron: "30 20 * * 1-5"
+  workflow_dispatch: {}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install finvizfinance pandas requests
+      - run: python momentum_scanner.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
