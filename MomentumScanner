@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""
+Momentum-scanner: minder bekende aandelen die al een paar dagen fors stijgen.
+
+Scant de Amerikaanse beurzen (via Finviz) op:
+  - marktkap >= $1 mrd  (geen nano-cap rommel)
+  - weekrendement boven een drempel (de "paar dagen forse groei")
+  - relatief volume hoog (volumebevestiging = echte beweging, geen ruis)
+  - voldoende gemiddeld volume (liquiditeit/verhandelbaarheid)
+en stuurt een kort kandidatenlijstje via Telegram.
+
+Verhandelbaarheid (ABN / BUX): als het bestand 'bux_tickers.txt' bestaat
+(een ticker per regel), worden alleen die namen getoond. Bestaat het niet,
+dan toont hij alle US-kandidaten -- die zijn boven $1 mrd vrijwel altijd bij
+ABN te koop; check een naam voor de zekerheid even in je broker-app.
+
+Dit is een ONTDEK-radar (watchlist-generator), GEEN koopsignaal. Buzz/hype op
+kleine namen is gameable; behandel kandidaten als iets om te onderzoeken.
+
+Secrets (GitHub Actions): TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+Deps: pip install finvizfinance pandas requests
+"""
+
+import os
+import sys
+import requests
+from finvizfinance.screener.overview import Overview
+
+# --- Config ---
+MIN_CAP = 1_000_000_000        # ondergrens marktkap ($)
+MAX_CAP = None                 # bovengrens ($) of None; bv. 20e9 om "minder bekend" te houden
+MAX_RESULTS = 15               # max namen in het bericht
+ALLOWLIST_FILE = "bux_tickers.txt"
+
+# Finviz-filters (pas de drempels naar smaak aan)
+FILTERS = {
+    "Market Cap.": "+Small (over $300mln)",  # >300M; >=1B wordt in code gefilterd
+    "Performance": "Week +20%",               # paar dagen forse groei
+    "Relative Volume": "Over 2",              # volumepiek t.o.v. normaal
+    "Average Volume": "Over 500K",            # liquiditeit
+}
+
+TG_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+TG_CHAT = os.environ["TELEGRAM_CHAT_ID"]
+ALERT, WARN = "\U0001F680", "\u26A0\uFE0F"
+
+
+def parse_cap(s):
+    """'1.50B' / '750.00M' -> float dollars."""
+    s = str(s).strip()
+    if not s or s in ("-", "nan", "None"):
+        return None
+    mult = {"B": 1e9, "M": 1e6, "K": 1e3, "T": 1e12}
+    try:
+        if s[-1] in mult:
+            return float(s[:-1]) * mult[s[-1]]
+        return float(s)
+    except ValueError:
+        return None
+
+
+def load_allowlist():
+    if os.path.exists(ALLOWLIST_FILE):
+        with open(ALLOWLIST_FILE) as f:
+            allow = {line.strip().upper() for line in f if line.strip()}
+        return allow or None
+    return None
+
+
+def screen():
+    fov = Overview()
+    fov.set_filter(filters_dict=FILTERS)
+    df = fov.screener_view()  # pandas DataFrame
+    if df is None or df.empty:
+        return []
+
+    allow = load_allowlist()
+    rows = []
+    for _, r in df.iterrows():
+        cap = parse_cap(r.get("Market Cap"))
+        if cap is None or cap < MIN_CAP:
+            continue
+        if MAX_CAP and cap > MAX_CAP:
+            continue
+        ticker = str(r.get("Ticker", "")).upper()
+        if allow is not None and ticker not in allow:
+            continue
+        rows.append({
+            "ticker": ticker,
+            "company": r.get("Company", ""),
+            "price": r.get("Price", ""),
+            "change": r.get("Change", ""),   # vandaag
+            "cap": cap,
+        })
+    # sorteer op grootste dagbeweging
+    def chg_val(x):
+        try:
+            return float(str(x["change"]).replace("%", ""))
+        except Exception:
+            return -999
+    rows.sort(key=chg_val, reverse=True)
+    return rows[:MAX_RESULTS]
+
+
+def fmt_cap(c):
+    return f"${c/1e9:.1f}B" if c >= 1e9 else f"${c/1e6:.0f}M"
+
+
+def send(msg):
+    requests.post(
+        f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+        json={"chat_id": TG_CHAT, "text": msg}, timeout=15,
+    )
+
+
+def main():
+    try:
+        rows = screen()
+    except Exception as e:
+        send(f"{WARN} Momentum-scanner: screen mislukt ({e}). "
+             "Finviz blokkeert mogelijk de runner.")
+        print(f"Fout: {e}")
+        return
+
+    if not rows:
+        print("Geen kandidaten.")
+        return
+
+    lines = [f"{r['ticker']}  {r['change']}  ({fmt_cap(r['cap'])})  {r['company'][:28]}"
+             for r in rows]
+    msg = (f"{ALERT} MOMENTUM-KANDIDATEN (week >+20%, hoog volume, >$1B)\n\n"
+           + "\n".join(lines)
+           + "\n\nOnderzoeksradar, geen koopsignaal. Check verhandelbaarheid in je broker.")
+    send(msg)
+    print(f"{len(rows)} kandidaten verstuurd.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(f"Fout: {e}", file=sys.stderr)
+        try:
+            send(f"{WARN} Momentum-scanner crashte: {e}")
+        except Exception:
+            pass
+        sys.exit(1)
