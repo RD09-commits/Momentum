@@ -1,0 +1,87 @@
+# Europees/Nederlands universum voor de momentum-scanner (Yahoo-tickers).
+# Een ticker per regel. Foute/onbekende tickers worden simpelweg overgeslagen.
+# Dit is een STARTLIJST -- breid uit met de STOXX 600 / AEX / AMX / AScX voor
+# bredere (en kleinere, "minder bekende") Europese dekking.
+
+# --- Nederland (Amsterdam, .AS) ---
+ASML.AS
+ADYEN.AS
+ASM.AS
+BESI.AS
+PHIA.AS
+INGA.AS
+ABN.AS
+AD.AS
+WKL.AS
+HEIA.AS
+PRX.AS
+AKZA.AS
+RAND.AS
+KPN.AS
+NN.AS
+AGN.AS
+DSFIR.AS
+IMCD.AS
+SBMO.AS
+GLPG.AS
+ARCAD.AS
+AALB.AS
+BFIT.AS
+FLOW.AS
+PNL.AS
+AMG.AS
+ALFEN.AS
+FUR.AS
+OCI.AS
+VPK.AS
+CRBN.AS
+JDEP.AS
+UMG.AS
+
+# --- Duitsland (.DE) ---
+SAP.DE
+SIE.DE
+ALV.DE
+MBG.DE
+BMW.DE
+VOW3.DE
+BAS.DE
+BAYN.DE
+DTE.DE
+IFX.DE
+
+# --- Frankrijk (.PA) ---
+MC.PA
+OR.PA
+AIR.PA
+SU.PA
+TTE.PA
+SAN.PA
+BNP.PA
+DG.PA
+AI.PA
+
+# --- Zwitserland (.SW) ---
+NESN.SW
+NOVN.SW
+ROG.SW
+UBSG.SW
+
+# --- VK (.L) ---
+AZN.L
+SHEL.L
+HSBA.L
+ULVR.L
+BP.L
+GSK.L
+RIO.L
+
+# --- Overig (.CO / .MI / .MC) ---
+NOVO-B.CO
+ENEL.MI
+ISP.MI
+UCG.MI
+ITX.MC
+SAN.MC
+IBE.MC
+BBVA.MC
