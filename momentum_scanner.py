@@ -41,9 +41,11 @@ PE_FLAG = 100.0                # P/E hierboven (of negatief) krijgt een vlaggetj
 US_FILTERS = {
     "Market Cap.": "+Small (over $300mln)",
     "Performance": "Week +20%",
-    "Relative Volume": "Over 2",
     "Average Volume": "Over 500K",
+    # relatief volume bewust NIET hier: dat checkt de code zelf met een
+    # robuuste (mediaan-)basislijn, anders valt een verse uitbarsting eruit.
 }
+DEBUG = bool(os.environ.get("DEBUG"))
 EU_UNIVERSE_FILE = "eu_universe.txt"
 BENCH = {"US": "^GSPC", "EU": "^STOXX"}   # S&P 500 / STOXX Europe 600
 
@@ -116,8 +118,11 @@ def scan(tickers, region):
             if len(close) < 6 or len(vol) < 21:
                 continue
             hr = horizon_returns(close)
-            relvol = vol.iloc[-1] / vol.iloc[-21:-1].mean()
+            base = vol.iloc[-21:-1].median()        # mediaan: ongevoelig voor 1 piekdag
+            relvol = vol.iloc[-1] / base if base else 0
             up_days = int((close.pct_change().dropna().iloc[-5:] > 0).sum())
+            if DEBUG:
+                print(f"  {t}: 1w={hr['1w']} relvol={relvol:.2f} up={up_days}/5")
             # Toegangsfilter
             if hr["1w"] is None or hr["1w"] < MOVE_MIN:
                 continue
